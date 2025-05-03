@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insulin Dose Calculator</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #f0f8ff; }
+        .calculator { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .input-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .result { margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 5px; }
+        .toggle-section { margin: 15px 0; padding: 10px; background: #f8f8f8; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h2>Insulin Dose Calculator</h2>
+        
+        <div class="toggle-section">
+            <label>Patient Type:</label>
+            <select id="patientType" onchange="toggleCalculator()">
+                <option value="opd">Outpatient (OPD)</option>
+                <option value="ipd">Admitted Patient</option>
+            </select>
+        </div>
+
+        <!-- Outpatient Calculator -->
+        <div id="opdCalculator">
+            <div class="input-group">
+                <label>Weight (kg):</label>
+                <input type="number" id="weight" step="0.1" required>
+            </div>
+
+            <div class="input-group">
+                <label>Diabetes Type:</label>
+                <select id="diabetesType">
+                    <option value="type1">Type 1</option>
+                    <option value="type2">Type 2</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>Current Blood Glucose (mg/dL):</label>
+                <input type="number" id="currentBG" required>
+            </div>
+
+            <div class="input-group">
+                <label>Target Blood Glucose (mg/dL):</label>
+                <input type="number" id="targetBG" value="120" required>
+            </div>
+
+            <div class="input-group">
+                <label>Carbs in Meal (grams):</label>
+                <input type="number" id="carbs" required>
+            </div>
+        </div>
+
+        <!-- Admitted Patient Calculator -->
+        <div id="ipdCalculator" style="display: none;">
+            <div class="input-group">
+                <label>Current Blood Glucose (mg/dL):</label>
+                <input type="number" id="ipdBG" required>
+            </div>
+            
+            <div class="input-group">
+                <label>Last Meal Time:</label>
+                <select id="mealTime">
+                    <option value="prebreakfast">Pre-breakfast</option>
+                    <option value="prelunch">Pre-lunch</option>
+                    <option value="predinner">Pre-dinner</option>
+                    <option value="bedtime">Bedtime</option>
+                </select>
+            </div>
+        </div>
+
+        <button onclick="calculateDose()">Calculate Dose</button>
+
+        <div class="result" id="result" style="display: none;">
+            <div id="opdResult">
+                <h3>OPD Recommended Dose</h3>
+                <p>Total Daily Dose (TDD): <span id="tdd"></span> units</p>
+                <p>Basal Insulin: <span id="basal"></span> units</p>
+                <p>Bolus Insulin: <span id="bolus"></span> units</p>
+                <p>Carb Ratio (CIR): 1 unit per <span id="cir"></span>g carbs</p>
+                <p>Insulin Sensitivity Factor (ISF): 1 unit lowers BG by <span id="isf"></span> mg/dL</p>
+                <p><strong>Total Pre-meal Dose: <span id="totalDose"></span> units</strong></p>
+            </div>
+
+            <div id="ipdResult" style="display: none;">
+                <h3>Sliding Scale Insulin Dose (8-hourly)</h3>
+                <p>Current Blood Glucose: <span id="currentIPDBG"></span> mg/dL</p>
+                <p>Recommended Dose: <span id="ssDose"></span> units</p>
+                <p>Next Dose Time: <span id="nextDoseTime"></span></p>
+                <p style="color: #666; font-size: 0.9em;">Calculation: BG ÷ 18 = <span id="ssCalc"></span></p>
+                <p style="color: #ff4444;">Monitor BG before next dose and adjust as needed.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleCalculator() {
+            const patientType = document.getElementById('patientType').value;
+            document.getElementById('opdCalculator').style.display = patientType === 'opd' ? 'block' : 'none';
+            document.getElementById('ipdCalculator').style.display = patientType === 'ipd' ? 'block' : 'none';
+        }
+
+        function calculateDose() {
+            const patientType = document.getElementById('patientType').value;
+            const result = document.getElementById('result');
+            
+            if (patientType === 'opd') {
+                // Existing OPD calculation
+                const weight = parseFloat(document.getElementById('weight').value);
+                const diabetesType = document.getElementById('diabetesType').value;
+                const currentBG = parseFloat(document.getElementById('currentBG').value);
+                const targetBG = parseFloat(document.getElementById('targetBG').value);
+                const carbs = parseFloat(document.getElementById('carbs').value);
+
+                const tddMultiplier = diabetesType === 'type1' ? 0.5 : 0.8;
+                const TDD = Math.round(weight * tddMultiplier);
+                const basal = Math.round(TDD * 0.5);
+                const CIR = Math.round(500 / TDD);
+                const ISF = Math.round(1800 / TDD);
+                const carbDose = Math.round((carbs / CIR) * 10) / 10;
+                const correctionDose = Math.round(((currentBG - targetBG) / ISF) * 10) / 10;
+                const totalDose = Math.round((carbDose + correctionDose) * 10) / 10;
+
+                document.getElementById('tdd').textContent = TDD;
+                document.getElementById('basal').textContent = basal;
+                document.getElementById('bolus').textContent = TDD - basal;
+                document.getElementById('cir').textContent = CIR;
+                document.getElementById('isf').textContent = ISF;
+                document.getElementById('totalDose').textContent = totalDose;
+                
+                document.getElementById('opdResult').style.display = 'block';
+                document.getElementById('ipdResult').style.display = 'none';
+                result.style.display = 'block';
+            } else {
+                // Inpatient sliding scale calculation
+                const ipdBG = parseFloat(document.getElementById('ipdBG').value);
+                const mealTime = document.getElementById('mealTime').value;
+                
+                // Calculate sliding scale dose (BG/18)
+                const rawDose = ipdBG / 18;
+                const roundedDose = Math.round(rawDose * 2) / 2; // Round to nearest 0.5
+                
+                // Calculate next dose time
+                const doseTimes = {
+                    'prebreakfast': '08:00 AM',
+                    'prelunch': '12:00 PM',
+                    'predinner': '06:00 PM',
+                    'bedtime': '10:00 PM'
+                };
+                const nextDose = Object.entries(doseTimes).find(
+                    ([key]) => key === mealTime
+                )[1];
+
+                document.getElementById('currentIPDBG').textContent = ipdBG;
+                document.getElementById('ssDose').textContent = roundedDose;
+                document.getElementById('ssCalc').textContent = `${ipdBG} ÷ 18 = ${rawDose.toFixed(1)}`;
+                document.getElementById('nextDoseTime').textContent = nextDose;
+                
+                document.getElementById('opdResult').style.display = 'none';
+                document.getElementById('ipdResult').style.display = 'block';
+                result.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
